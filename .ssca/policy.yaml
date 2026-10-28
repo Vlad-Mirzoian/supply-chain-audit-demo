@@ -1,0 +1,53 @@
+# Supply-chain policy of acme-orders-api (policy as code, reviewed like code)
+version: 1
+ecosystems: [npm]
+reachability: true
+thresholds:
+  fail_on_band: critical
+  warn_on_band: high
+  incomplete_analysis: fail
+# packages that are released from CI with provenance: a release without a
+# valid attestation from the expected repository is treated as unsigned
+require_provenance:
+  axios: github.com/axios/axios
+# private packages that must only come from the internal registry
+internal:
+  scopes: ["@acme"]
+  names: [acme-billing-core, acme-auth-client]
+  registry: https://npm.acme.internal/
+rules:
+  - id: known-malicious
+    when: vuln.id startswith 'MAL-'
+    action: fail
+  - id: exploited-in-runtime
+    when: vuln.kev == true and component.scope == 'runtime' and not vuln.suppressed
+    action: fail
+  - id: critical-reachable-cve
+    when: vuln.severity == 'critical' and vuln.reachable != 'no' and component.scope == 'runtime' and not vuln.suppressed
+    action: fail
+  - id: critical-unreachable-cve
+    when: vuln.severity == 'critical' and vuln.reachable == 'no' and not vuln.suppressed
+    action: warn
+  - id: unsigned-artifact
+    when: finding.rule == 'unsigned-artifact' or finding.rule == 'unexpected-source' or finding.rule == 'provenance-invalid'
+    action: fail
+  - id: integrity-failure
+    when: finding.kind == 'integrity'
+    action: fail
+  - id: dependency-confusion
+    when: signals.dependency_confusion == true
+    action: fail
+  - id: provenance-regression
+    when: signals.provenance_regression == true
+    action: fail
+  - id: cooldown
+    when: component.release_age_days < 7
+    action: warn
+  - id: unpinned-ci-action
+    when: ci.action_ref_type != 'sha'
+    action: fail
+exceptions:
+  - component: pkg:npm/path-to-regexp
+    rule: band-high
+    reason: 'ReDoS not exploitable: routes are static (ticket SEC-142)'
+    expires: 2027-03-31

@@ -1,0 +1,84 @@
+name: supply-chain
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write   # upload SARIF to code scanning
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install ssca (pinned release, checksum verified)
+        run: |
+          curl -sSfL -o ssca "$SSCA_URL"
+          echo "$SSCA_SHA256  ssca" | sha256sum -c -
+          chmod +x ssca && sudo mv ssca /usr/local/bin/ssca
+        env:
+          SSCA_URL: ${{ vars.SSCA_RELEASE_URL }}
+          SSCA_SHA256: ${{ vars.SSCA_RELEASE_SHA256 }}
+      - name: Audit CI configuration (M5)
+        run: ssca ci-audit .
+      - name: Supply-chain audit and policy gate (M0-M6)
+        run: ssca scan --policy .ssca/policy.yaml --out ssca-out .
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3
+        with:
+          sarif_file: ssca-out/findings.sarif
+      - name: Keep evidence bundle
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ssca-evidence
+          path: ssca-out/
+  build:
+    needs: audit
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write          # keyless signing with Sigstore
+      attestations: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - run: npm pack --ignore-scripts
+      - id: attest
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: acme-orders-api-*.tgz
+      - run: cp "${{ steps.attest.outputs.bundle-path }}" acme-orders-api.tgz.sigstore.json && mv acme-orders-api-*.tgz acme-orders-api.tgz
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release
+          path: |
+            acme-orders-api.tgz
+            acme-orders-api.tgz.sigstore.json
+  release-gate:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release
+      - name: Install ssca
+        run: |
+          curl -sSfL -o ssca "$SSCA_URL" && echo "$SSCA_SHA256  ssca" | sha256sum -c - && chmod +x ssca
+        env:
+          SSCA_URL: ${{ vars.SSCA_RELEASE_URL }}
+          SSCA_SHA256: ${{ vars.SSCA_RELEASE_SHA256 }}
+      - name: Verify signature and provenance of the release artifact (M3)
+        run: ./ssca verify-artifact --repo "$GITHUB_REPOSITORY" acme-orders-api.tgz
