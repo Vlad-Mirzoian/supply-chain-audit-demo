@@ -1,6 +1,4 @@
 # Supply-chain policy of acme-orders-api (policy as code, reviewed like code)
-version: 1
-ecosystems: [npm]
 reachability: true
 thresholds:
   fail_on_band: critical
