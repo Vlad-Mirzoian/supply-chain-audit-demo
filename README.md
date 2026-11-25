@@ -37,10 +37,10 @@ supply-chain attack or mistake and is opened as a pull request against `main`:
 | Branch | Change in the pull request | Expected decision |
 |---|---|---|
 | `main` | — | **PASS** (5 high-band warnings) |
-| `s1-unsigned-dependency` | pin axios to 1.13.3, a release published without the provenance that the previous release had | **FAIL**: `unsigned-artifact`, `provenance-regression`, `band-critical` |
+| `s1-unsigned-dependency` | pin axios to 1.13.3, a release published without the provenance that the previous release had | **FAIL**: `provenance-regression`, `band-critical` |
 | `s2-critical-reachable-cve` | downgrade ejs to 3.1.6 to match legacy templates | **FAIL**: `critical-reachable-cve` (GHSA-phwq-j96m-2c2q, template injection, reachable from `src/`) |
 | `s3-dependency-confusion` | add the internal package `acme-billing-core`; the lockfile resolves it from the public registry instead of the internal one | **FAIL**: `dependency-confusion`, `band-critical` |
-| `s4-compromised-dev-tool` | add `eslint-config-prettier` 10.1.7 as a development dependency | **FAIL**: `known-malicious` (MAL-2025-6022), `band-critical` |
+| `s4-compromised-dev-tool` | add `eslint-config-prettier` 10.1.7 as a development dependency | **FAIL**: `known-malicious` (MAL-2025-6022, baseline rule), `band-critical` |
 
 The scenarios refer to real packages only to show how the policy reacts to
 facts recorded in public data. For s1 there is no indication that axios 1.13.3
