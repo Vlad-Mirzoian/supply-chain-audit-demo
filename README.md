@@ -50,7 +50,7 @@ eslint-config-prettier release of s4 was published in July 2025 from a
 maintainer account taken over by phishing, contained malware in an install
 script and was removed from npm; it is listed in OSV as MAL-2025-6022.
 
-The decisions above were obtained with ssca 1.0.0 to 1.0.5; the scores of individual
+The decisions above were obtained with ssca 1.0.0 to 1.1.0; the scores of individual
 components can change over time as advisories and registry data change.
 
 ## Run locally
